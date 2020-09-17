@@ -1,0 +1,764 @@
+---
+title: "WAR 2020V"
+output: html_document
+---
+
+Make streamlined function to calc WAR
+
+```{r}
+library(tidyverse)
+library(psych)
+
+data <- readRDS("Half_FF_Complete_WAR.rds")
+
+# Redo calculation as interceptions were missed
+
+basepos <- c("QB","WR","RB","TE")
+dstk <- c("K","DST")
+
+df <- data %>% 
+  mutate(half = case_when(
+    position %in% basepos ~ (pass_yards * .04) + 
+    (pass_td *4) + 
+    (pass_2pt * 2) + 
+    (rush_yards * .1) + 
+    (rush_td * 6) + 
+    (rush_2pt * 2) + 
+    (rec_yards * .1) + 
+    (rec_td * 6) + 
+    (rec_2pt * 2) + 
+    (fum_lost * -2) + 
+    (rec_catches * .5) +
+    (pass_int * -2),
+    position %in% dstk ~ points))
+
+
+```
+
+
+# Make yearly funtion to calculate team averages and war
+
+```{r message=FALSE, warning=FALSE}
+yrs <- c(2010:2019)
+
+#QB
+qb_top_12 <- map_dfr(.x = yrs,
+                     .f = function(x) {
+                      df %>%  
+                         filter(year == x,
+                                position == "QB") %>%  
+                         mutate(pos = "QB") %>% 
+                         group_by(player) %>%
+                         summarise(total_pts = sum(half), 
+                                   games = n(), 
+                                   ppg = total_pts / games, 
+                                   season = x) %>%
+                         arrange(desc(ppg)) %>%
+                         filter(games >= 6) %>% 
+                         top_n(n = 12, wt = ppg)
+                       
+                     }) 
+
+qb_figures <- qb_top_12 %>% 
+  left_join(df, by = c("player","season" = "year")) %>% 
+  group_by(season) %>% 
+  summarise(mean = mean(half), sd = sd(half))
+
+#RB
+rb_top_24 <- map_dfr(.x = yrs,
+                     .f = function(x) {
+                      df %>%  
+                         filter(year == x,
+                                position == "RB") %>%  
+                         mutate(pos = "RB") %>% 
+                         group_by(player) %>%
+                         summarise(total_pts = sum(half), 
+                                   games = n(), 
+                                   ppg = total_pts / games, 
+                                   season = x) %>%
+                         arrange(desc(ppg)) %>%
+                         filter(games >= 6) %>%
+                         top_n(n = 24, wt = ppg)
+                       
+                     }) 
+
+rb_figures <- rb_top_24 %>% 
+  left_join(df, by = c("player","season" = "year")) %>% 
+  group_by(season) %>% 
+  summarise(mean = mean(half), sd = sd(half))
+
+
+#WR
+wr_top_24 <- map_dfr(.x = yrs,
+                     .f = function(x) {
+                      df %>%  
+                         filter(year == x,
+                                position == "WR") %>%  
+                         mutate(pos = "WR") %>% 
+                         group_by(player) %>%
+                         summarise(total_pts = sum(half), 
+                                   games = n(), 
+                                   ppg = total_pts / games, 
+                                   season = x) %>%
+                         arrange(desc(ppg)) %>%
+                         filter(games >= 6) %>%
+                         top_n(n = 24, wt = ppg)
+                       
+                     }) 
+
+wr_figures <- wr_top_24 %>% 
+  left_join(df, by = c("player","season" = "year")) %>% 
+  group_by(season) %>% 
+  summarise(mean = mean(half), sd = sd(half))
+
+#TE
+te_top_12 <- map_dfr(.x = yrs,
+                     .f = function(x) {
+                      df %>%  
+                         filter(year == x,
+                                position == "TE") %>%  
+                         mutate(pos = "TE") %>% 
+                         group_by(player) %>%
+                         summarise(total_pts = sum(half), 
+                                   games = n(), 
+                                   ppg = total_pts / games, 
+                                   season = x) %>%
+                         arrange(desc(ppg)) %>%
+                         filter(games >= 6) %>%
+                         top_n(n = 12, wt = ppg)
+                       
+                     }) 
+
+te_figures <- te_top_12 %>% 
+  left_join(df, by = c("player","season" = "year")) %>% 
+  group_by(season) %>% 
+  summarise(mean = mean(half), sd = sd(half))
+
+# Flex
+
+rbflx_names <- map_dfr(.x = yrs,
+                     .f = function(x) {
+                      df %>%  
+                         filter(year == x,
+                                position == "RB") %>%  
+                         mutate(pos = "RB") %>% 
+                         group_by(player) %>%
+                         summarise(pos = first(pos),
+                                   total_pts = sum(half), 
+                                   games = n(), 
+                                   ppg = total_pts / games, 
+                                   season = x) %>%
+                         arrange(desc(ppg)) %>%
+                         filter(games >= 6) %>%
+                         top_n(n = 36, wt = ppg) %>% 
+                         top_n(n = -12, wt = ppg)
+                       
+                     })
+
+# WR flex names
+wrflx_names <- map_dfr(.x = yrs,
+                     .f = function(x) {
+                      df %>%  
+                         filter(year == x,
+                                position == "WR") %>%  
+                         mutate(pos = "WR") %>% 
+                         group_by(player) %>%
+                         summarise(pos = first(pos),
+                                   total_pts = sum(half), 
+                                   games = n(), 
+                                   ppg = total_pts / games, 
+                                   season = x) %>%
+                         arrange(desc(ppg)) %>%
+                         filter(games >= 6) %>%
+                         top_n(n = 36, wt = ppg) %>% 
+                         top_n(n = -12, wt = ppg)
+                       
+                     })
+
+
+# TE flex names
+
+teflx_names <- map_dfr(.x = yrs,
+                     .f = function(x) {
+                      df %>%  
+                         filter(year == x,
+                                position == "TE") %>% 
+                         mutate(pos = "TE") %>% 
+                         group_by(player) %>%
+                         summarise(pos = first(pos),
+                                   total_pts = sum(half), 
+                                   games = n(), 
+                                   ppg = total_pts / games, 
+                                   season = x) %>%
+                         arrange(desc(ppg)) %>%
+                         filter(games >= 6) %>%
+                         top_n(n = 24, wt = ppg) %>% 
+                         top_n(n = -12, wt = ppg)
+                       
+                     })
+
+#combine together and get top 12 for each year
+flex_pool <- bind_rows(rbflx_names, wrflx_names, teflx_names)
+
+#join all games for each player in flex pool
+flex_figures <- flex_pool %>% 
+  left_join(df, by = c("player","season" = "year")) %>% 
+  #now we have all games of all flex eligible players since 2010, so we can group by year and get avg pts and std
+  ungroup() %>% 
+  group_by(season) %>% 
+  summarise(mean = mean(half, na.rm = T), sd = sd(half, na.rm = T))
+
+# slight changes for k and dst - take top each week
+
+k_figures <- df %>% 
+  filter(position == "K") %>% 
+  group_by(year, week, player) %>% 
+  summarise(total_pts = sum(half)) %>% 
+  arrange(desc(year), week, desc(total_pts)) %>% 
+  # now with all kickers since 2010 ordered in year, week and top pts scored, we can filter the top 12 of each year/week and get avg
+  ungroup() %>% 
+  group_by(year, week) %>% 
+  top_n(n = 12, wt = total_pts) %>% 
+  # now with all top 12 finishes of each year and week, we can ungroup and group by year only to get annual metrics
+  ungroup() %>% 
+  group_by(year) %>% 
+  summarise(mean = mean(total_pts, na.rm = T), sd = sd(total_pts, na.rm = T))
+  
+# that should do it for kickers. The SD is smaller bc we are presuming the best ones play each week due to the high streaming of the position. Same thing will be done for DST now
+
+# DST
+dst_figures <- df %>% 
+  filter(position == "DST") %>% 
+  group_by(year, week, player) %>% 
+  summarise(total_pts = sum(half)) %>% 
+  arrange(desc(year), week, desc(total_pts)) %>% 
+  # now with all kickers since 2010 ordered in year, week and top pts scored, we can filter the top 12 of each year/week and get avg
+  ungroup() %>% 
+  group_by(year, week) %>% 
+  top_n(n = 12, wt = total_pts) %>% 
+  # now with all top 12 finishes of each year and week, we can ungroup and group by year only to get annual metrics
+  ungroup() %>% 
+  group_by(year) %>% 
+  summarise(mean = mean(total_pts, na.rm = T), sd = sd(total_pts, na.rm = T))
+
+```
+
+# Compute Average Team Mean and SD
+```{r}
+
+# Would love to learn a better way to do this
+
+# Average Team Points per week
+avg_team_2010_mean <- qb_figures$mean[1] + (rb_figures$mean[1] * 2) + (wr_figures$mean[1] * 2) +
+  te_figures$mean[1] + flex_figures$mean[1] + kicker_figures$mean[1] +
+  dst_figures$mean[1]
+
+# Average team standard deviation per week
+
+avg_team_2010_sd <- sqrt((qb_figures$sd[1] ^ 2) + 
+                          (rb_figures$sd[1] ^2) + 
+                           (rb_figures$sd[1] ^ 2) +
+                           (wr_figures$sd[1] ^ 2) +
+                           (wr_figures$sd[1] ^2) +
+                           (te_figures$sd[1] ^ 2) + 
+                           (flex_figures$sd[1] ^ 2) + 
+                           (kicker_figures$sd[1] ^ 2) +
+                           (dst_figures$sd[1] ^ 2))
+
+# Map this out for each year
+
+
+# List last ten year AVG
+avg_team_pts <- map(.x = c(1:10),
+                .f = function(x){
+                  
+                  avg_team_mean <- qb_figures$mean[x] + (rb_figures$mean[x] * 2) + (wr_figures$mean[x] * 2) +
+  te_figures$mean[x] + flex_figures$mean[x] + kicker_figures$mean[x] +
+  dst_figures$mean[x]
+
+                })
+
+# List last ten year SD
+avg_team_sd <- map(.x = c(1:10),
+                   .f = function(x) {
+                    avg_team_sd <- sqrt((qb_figures$sd[1] ^ 2) + 
+                          (rb_figures$sd[x] ^2) + 
+                           (rb_figures$sd[x] ^ 2) +
+                           (wr_figures$sd[x] ^ 2) +
+                           (wr_figures$sd[x] ^2) +
+                           (te_figures$sd[x] ^ 2) + 
+                           (flex_figures$sd[x] ^ 2) + 
+                           (kicker_figures$sd[x] ^ 2) +
+                           (dst_figures$sd[x] ^ 2))
+                   })
+```
+
+# Start creating weekly win probabilities 
+```{r}
+
+war <- df %>% 
+  mutate(exp_team_pts = case_when(
+    # 2010
+    year == 2010 & position == "QB" ~ (half - qb_figures$mean[1]) + avg_team_pts[[1]],
+    year == 2010 & position == "RB" ~ (half - rb_figures$mean[1]) + avg_team_pts[[1]],
+    year == 2010 & position == "WR" ~ (half - wr_figures$mean[1]) + avg_team_pts[[1]],
+    year == 2010 & position == "TE" ~ (half - te_figures$mean[1]) + avg_team_pts[[1]],
+    year == 2010 & position == "DST" ~ (half - dst_figures$mean[1]) + avg_team_pts[[1]],
+    year == 2010 & position == "K" ~ (half - k_figures$mean[1]) + avg_team_pts[[1]],
+    # 2011
+    year == 2011 & position == "QB" ~ (half - qb_figures$mean[2]) + avg_team_pts[[2]],
+    year == 2011 & position == "RB" ~ (half - rb_figures$mean[2]) + avg_team_pts[[2]],
+    year == 2011 & position == "WR" ~ (half - wr_figures$mean[2]) + avg_team_pts[[2]],
+    year == 2011 & position == "TE" ~ (half - te_figures$mean[2]) + avg_team_pts[[2]],
+    year == 2011 & position == "DST" ~ (half - dst_figures$mean[2]) + avg_team_pts[[2]],
+    year == 2011 & position == "K" ~ (half - k_figures$mean[2]) + avg_team_pts[[2]],
+    # 2012
+    year == 2012 & position == "QB" ~ (half - qb_figures$mean[3]) + avg_team_pts[[3]],
+    year == 2012 & position == "RB" ~ (half - rb_figures$mean[3]) + avg_team_pts[[3]],
+    year == 2012 & position == "WR" ~ (half - wr_figures$mean[3]) + avg_team_pts[[3]],
+    year == 2012 & position == "TE" ~ (half - te_figures$mean[3]) + avg_team_pts[[3]],
+    year == 2012 & position == "DST" ~ (half - dst_figures$mean[3]) + avg_team_pts[[3]],
+    year == 2012 & position == "K" ~ (half - k_figures$mean[3]) + avg_team_pts[[3]],
+    # 2013
+    year == 2013 & position == "QB" ~ (half - qb_figures$mean[4]) + avg_team_pts[[4]],
+    year == 2013 & position == "RB" ~ (half - rb_figures$mean[4]) + avg_team_pts[[4]],
+    year == 2013 & position == "WR" ~ (half - wr_figures$mean[4]) + avg_team_pts[[4]],
+    year == 2013 & position == "TE" ~ (half - te_figures$mean[4]) + avg_team_pts[[4]],
+    year == 2013 & position == "DST" ~ (half - dst_figures$mean[4]) + avg_team_pts[[4]],
+    year == 2013 & position == "K" ~ (half - k_figures$mean[4]) + avg_team_pts[[4]],
+    # 2014
+    year == 2014 & position == "QB" ~ (half - qb_figures$mean[5]) + avg_team_pts[[5]],
+    year == 2014 & position == "RB" ~ (half - rb_figures$mean[5]) + avg_team_pts[[5]],
+    year == 2014 & position == "WR" ~ (half - wr_figures$mean[5]) + avg_team_pts[[5]],
+    year == 2014 & position == "TE" ~ (half - te_figures$mean[5]) + avg_team_pts[[5]],
+    year == 2014 & position == "DST" ~ (half - dst_figures$mean[5]) + avg_team_pts[[5]],
+    year == 2014 & position == "K" ~ (half - k_figures$mean[5]) + avg_team_pts[[5]],
+    # 2015
+    year == 2015 & position == "QB" ~ (half - qb_figures$mean[6]) + avg_team_pts[[6]],
+    year == 2015 & position == "RB" ~ (half - rb_figures$mean[6]) + avg_team_pts[[6]],
+    year == 2015 & position == "WR" ~ (half - wr_figures$mean[6]) + avg_team_pts[[6]],
+    year == 2015 & position == "TE" ~ (half - te_figures$mean[6]) + avg_team_pts[[6]],
+    year == 2015 & position == "DST" ~ (half - dst_figures$mean[6]) + avg_team_pts[[6]],
+    year == 2015 & position == "K" ~ (half - k_figures$mean[6]) + avg_team_pts[[6]],
+    # 2016
+    year == 2016 & position == "QB" ~ (half - qb_figures$mean[7]) + avg_team_pts[[7]],
+    year == 2016 & position == "RB" ~ (half - rb_figures$mean[7]) + avg_team_pts[[7]],
+    year == 2016 & position == "WR" ~ (half - wr_figures$mean[7]) + avg_team_pts[[7]],
+    year == 2016 & position == "TE" ~ (half - te_figures$mean[7]) + avg_team_pts[[7]],
+    year == 2016 & position == "DST" ~ (half - dst_figures$mean[7]) + avg_team_pts[[7]],
+    year == 2016 & position == "K" ~ (half - k_figures$mean[7]) + avg_team_pts[[7]],
+    # 2017
+    year == 2017 & position == "QB" ~ (half - qb_figures$mean[8]) + avg_team_pts[[8]],
+    year == 2017 & position == "RB" ~ (half - rb_figures$mean[8]) + avg_team_pts[[8]],
+    year == 2017 & position == "WR" ~ (half - wr_figures$mean[8]) + avg_team_pts[[8]],
+    year == 2017 & position == "TE" ~ (half - te_figures$mean[8]) + avg_team_pts[[8]],
+    year == 2017 & position == "DST" ~ (half - dst_figures$mean[8]) + avg_team_pts[[8]],
+    year == 2017 & position == "K" ~ (half - k_figures$mean[8]) + avg_team_pts[[8]],
+    # 2018
+    year == 2018 & position == "QB" ~ (half - qb_figures$mean[9]) + avg_team_pts[[9]],
+    year == 2018 & position == "RB" ~ (half - rb_figures$mean[9]) + avg_team_pts[[9]],
+    year == 2018 & position == "WR" ~ (half - wr_figures$mean[9]) + avg_team_pts[[9]],
+    year == 2018 & position == "TE" ~ (half - te_figures$mean[9]) + avg_team_pts[[9]],
+    year == 2018 & position == "DST" ~ (half - dst_figures$mean[9]) + avg_team_pts[[9]],
+    year == 2018 & position == "K" ~ (half - k_figures$mean[9]) + avg_team_pts[[9]],
+    # 2019
+    year == 2019 & position == "QB" ~ (half - qb_figures$mean[10]) + avg_team_pts[[10]],
+    year == 2019 & position == "RB" ~ (half - rb_figures$mean[10]) + avg_team_pts[[10]],
+    year == 2019 & position == "WR" ~ (half - wr_figures$mean[10]) + avg_team_pts[[10]],
+    year == 2019 & position == "TE" ~ (half - te_figures$mean[10]) + avg_team_pts[[10]],
+    year == 2019 & position == "DST" ~ (half - dst_figures$mean[10]) + avg_team_pts[[10]],
+    year == 2019 & position == "K" ~ (half - k_figures$mean[10]) + avg_team_pts[[10]],
+    TRUE ~ 0),
+    win_percent = case_when(
+          # 2010
+    year == 2010 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[1]], avg_team_sd[[1]]),
+    year == 2010 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[1]], avg_team_sd[[1]]),
+    year == 2010 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[1]], avg_team_sd[[1]]),
+    year == 2010 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[1]], avg_team_sd[[1]]),
+    year == 2010 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[1]], avg_team_sd[[1]]),
+    year == 2010 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[1]], avg_team_sd[[1]]),
+    # 2011
+    year == 2011 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[2]], avg_team_sd[[2]]),
+    year == 2011 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[2]], avg_team_sd[[2]]),
+    year == 2011 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[2]], avg_team_sd[[2]]),
+    year == 2011 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[2]], avg_team_sd[[2]]),
+    year == 2011 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[2]], avg_team_sd[[2]]),
+    year == 2011 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[2]], avg_team_sd[[2]]),
+    # 2012
+    year == 2012 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[3]], avg_team_sd[[3]]),
+    year == 2012 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[3]], avg_team_sd[[3]]),
+    year == 2012 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[3]], avg_team_sd[[3]]),
+    year == 2012 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[3]], avg_team_sd[[3]]),
+    year == 2012 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[3]], avg_team_sd[[3]]),
+    year == 2012 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[3]], avg_team_sd[[3]]),
+    # 2013
+    year == 2013 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[4]], avg_team_sd[[4]]),
+    year == 2013 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[4]], avg_team_sd[[4]]),
+    year == 2013 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[4]], avg_team_sd[[4]]),
+    year == 2013 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[4]], avg_team_sd[[4]]),
+    year == 2013 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[4]], avg_team_sd[[4]]),
+    year == 2013 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[4]], avg_team_sd[[4]]),
+    # 2014
+    year == 2014 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[5]], avg_team_sd[[5]]),
+    year == 2014 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[5]], avg_team_sd[[5]]),
+    year == 2014 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[5]], avg_team_sd[[5]]),
+    year == 2014 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[5]], avg_team_sd[[5]]),
+    year == 2014 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[5]], avg_team_sd[[5]]),
+    year == 2014 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[5]], avg_team_sd[[5]]),
+    # 2015
+    year == 2015 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[6]], avg_team_sd[[6]]),
+    year == 2015 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[6]], avg_team_sd[[6]]),
+    year == 2015 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[6]], avg_team_sd[[6]]),
+    year == 2015 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[6]], avg_team_sd[[6]]),
+    year == 2015 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[6]], avg_team_sd[[6]]),
+    year == 2015 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[6]], avg_team_sd[[6]]),
+    # 2016
+    year == 2016 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[7]], avg_team_sd[[7]]),
+    year == 2016 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[7]], avg_team_sd[[7]]),
+    year == 2016 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[7]], avg_team_sd[[7]]),
+    year == 2016 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[7]], avg_team_sd[[7]]),
+    year == 2016 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[7]], avg_team_sd[[7]]),
+    year == 2016 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[7]], avg_team_sd[[7]]),
+    # 2017
+    year == 2017 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[8]], avg_team_sd[[8]]),
+    year == 2017 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[8]], avg_team_sd[[8]]),
+    year == 2017 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[8]], avg_team_sd[[8]]),
+    year == 2017 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[8]], avg_team_sd[[8]]),
+    year == 2017 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[8]], avg_team_sd[[8]]),
+    year == 2017 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[8]], avg_team_sd[[8]]),
+    # 2018
+    year == 2018 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[9]], avg_team_sd[[9]]),
+    year == 2018 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[9]], avg_team_sd[[9]]),
+    year == 2018 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[9]], avg_team_sd[[9]]),
+    year == 2018 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[9]], avg_team_sd[[9]]),
+    year == 2018 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[9]], avg_team_sd[[9]]),
+    year == 2018 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[9]], avg_team_sd[[9]]),
+    # 2019
+    year == 2019 & position == "QB" ~ pnorm(exp_team_pts, avg_team_pts[[10]], avg_team_sd[[10]]),
+    year == 2019 & position == "RB" ~ pnorm(exp_team_pts, avg_team_pts[[10]], avg_team_sd[[10]]),
+    year == 2019 & position == "WR" ~ pnorm(exp_team_pts, avg_team_pts[[10]], avg_team_sd[[10]]),
+    year == 2019 & position == "TE" ~ pnorm(exp_team_pts, avg_team_pts[[10]], avg_team_sd[[10]]),
+    year == 2019 & position == "DST" ~ pnorm(exp_team_pts, avg_team_pts[[10]], avg_team_sd[[10]]),
+    year == 2019 & position == "K" ~ pnorm(exp_team_pts, avg_team_pts[[10]], avg_team_sd[[10]])))
+
+```
+
+# Replacement level win percentages
+```{r}
+# List for replacement level indexing
+dst_top_12 <- df %>% 
+  filter(position == "DST") %>% 
+  group_by(year, week, player) %>% 
+  summarise(total_pts = sum(half)) %>% 
+  arrange(desc(year), week, desc(total_pts)) %>% 
+  # now with all dsts since 2010 ordered in year, week and top pts scored, we can filter the top 12 of each year/week and get avg
+  ungroup() %>% 
+  rename(season = year) %>% 
+  group_by(season, week) %>% 
+  arrange(season, week, desc(total_pts)) %>% 
+  top_n(n = 12, wt = total_pts) %>% 
+  filter(total_pts == min(total_pts)) %>% 
+  # left join to get the win per attached to each replacement level for each week of every year
+  left_join(war, by = c("season" = "year", "week", "player")) %>% 
+  ungroup() %>% 
+  # Now group by year only to summarize avg win per for all replacement dsts of each week combined
+  group_by(season) %>% 
+  summarise(position = "DST", replacement_wp = mean(win_percent, na.rm = T))
+
+# kicker
+k_top_12 <- df %>% 
+  filter(position == "K") %>% 
+  group_by(year, week, player) %>% 
+  summarise(total_pts = sum(half)) %>% 
+  arrange(desc(year), week, desc(total_pts)) %>% 
+  # now with all kickers since 2010 ordered in year, week and top pts scored, we can filter the top 12 of each year/week and get avg
+  ungroup() %>% 
+  rename(season = year) %>% 
+  group_by(season, week) %>% 
+  arrange(season, week, desc(total_pts)) %>% 
+  top_n(n = 12, wt = total_pts) %>% 
+  filter(total_pts == min(total_pts)) %>% 
+  # left join to get the win per attached to each replacement level for each week of every year
+  left_join(war, by = c("season" = "year", "week", "player")) %>% 
+  ungroup() %>% 
+  # Now group by year only to summarize avg win per for all replacement dsts of each week combined
+  group_by(season) %>% 
+  summarise(position = "K", replacement_wp = mean(win_percent, na.rm = T))
+
+
+
+
+# combine all top 12 players
+
+
+qb_repl_names <- qb_top_12 %>% 
+  ungroup() %>% 
+  group_by(season) %>% 
+  arrange(desc(ppg)) %>% 
+  filter(ppg == min(ppg)) %>% 
+  select(player) %>% 
+  ungroup() %>% 
+  # join all games from each replacement level year
+  left_join(war, by = c("season" = "year", "player")) %>% 
+  group_by(season, position) %>% 
+  summarise(replacement_wp = mean(win_percent))
+
+# RB 
+rb_repl_names <- rb_top_24 %>% 
+  ungroup() %>% 
+  group_by(season) %>% 
+  arrange(desc(ppg)) %>% 
+  filter(ppg == min(ppg)) %>% 
+  select(player) %>% 
+  ungroup() %>% 
+  # join all games from each replacement level year
+  left_join(war, by = c("season" = "year", "player")) %>% 
+  group_by(season, position) %>% 
+  summarise(replacement_wp = mean(win_percent))
+
+# WR
+wr_repl_names <- wr_top_24 %>% 
+  ungroup() %>% 
+  group_by(season) %>% 
+  arrange(desc(ppg)) %>% 
+  filter(ppg == min(ppg)) %>% 
+  select(player) %>% 
+  ungroup() %>% 
+  # join all games from each replacement level year
+  left_join(war, by = c("season" = "year", "player")) %>% 
+  group_by(season, position) %>% 
+  summarise(replacement_wp = mean(win_percent))
+
+te_repl_names <- te_top_12 %>% 
+  ungroup() %>% 
+  group_by(season) %>% 
+  arrange(desc(ppg)) %>% 
+  filter(ppg == min(ppg)) %>% 
+  select(player) %>% 
+  ungroup() %>% 
+  # join all games from each replacement level year
+  left_join(war, by = c("season" = "year", "player")) %>% 
+  group_by(season, position) %>% 
+  summarise(replacement_wp = mean(win_percent))
+
+# OK im tired and probably need to clean up these names but whatever
+
+all_replacement <-  bind_rows(qb_repl_names, rb_repl_names, wr_repl_names, te_repl_names, dst_top_12, k_top_12) %>% 
+  ungroup()
+
+# attach to main and finish feature engineering
+
+war$player <- as.character(war$player)
+war$position <- as.character(war$position)
+
+
+
+war_final <- war %>% 
+  inner_join(all_replacement, by = c("year" = "season", "position")) %>% 
+  ungroup() %>% 
+  group_by(year, player, position) %>%
+  summarise(avg_wp = mean(win_percent, na.rm = T),
+            games = n(),
+            wins_exp = avg_wp * 12,
+            repl_wins_exp = mean(replacement_wp * 12),
+            WAR = wins_exp - repl_wins_exp) %>% 
+  ungroup() %>% 
+  filter(games >= 6) %>% 
+  arrange(desc(WAR)) %>% 
+  mutate(rank = row_number(),
+         player = str_replace(player, "Odell Beckham.*", "Odell Beckham"))
+
+
+# save this mother fucker
+saveRDS(war_final, file = "WAR_HPPR_2010_2019.rds")
+
+```
+
+# Graph
+
+```{r message=FALSE, warning=FALSE}
+
+source("538 graph source code.r")
+
+#get help with graph coding
+graph_code <- war_final %>% 
+  filter(rank <= 40) %>% 
+  select(1:3, 8,9)
+write.csv(graph_code, file = "graph_code.csv")
+
+
+library(ggplot2)
+war_final %>% 
+  mutate(label = paste0(player, " ", position, " ", year, " Rank: ", rank)) %>% 
+  filter(rank <= 40) %>% 
+  ggplot(aes(reorder(label, WAR), WAR)) +
+  geom_col()+
+  coord_flip()+
+  theme_538() +
+  theme(axis.text = element_text(size = 8, hjust = 20)) +
+  labs(title = "Top 50 WAR Last 10 Years",
+       subtitle = "2010 - 2019",
+       y = "Wins Above Replacement",
+       x = "",
+       caption = ".5 PPR (QB-2RB-2WR-FLX-TE-K-DST)")
+
+
+```
+
+# Graph For Scott Barrett
+```{r}
+library(tidyverse)
+library(Cairo)
+library(magick)
+
+#color pallate
+my_pallette <- c("#32A13F", 
+                 "#4F8DC8",
+                 "#EC3D17",
+                 "#32B639",
+                 "#CFD509",
+                 "#CFD509")
+
+# EC3D17 - red
+# 4F8DC8 - blue
+# CFD509 - yellow
+
+
+theme_new <- function() {
+  theme_bw(base_size = 24) %+replace%
+    theme(
+      panel.grid = element_blank(),
+      axis.text = element_text(family = "Chakra Petch", size = 24),
+      axis.title = element_text(family = "Chakra Petch", face = "bold"),
+      plot.title = element_text(family = "Chakra Petch", face = "bold", size = 34)
+    )
+}
+graph_code <- readRDS("WAR_HPPR_2010_2019.rds") 
+
+war_frame <- graph_code %>% 
+  mutate(name_label = paste0(player, " ", " (", year, ")"),
+         label = paste0("Rank: ", rank, " - ", position)) %>% 
+  filter(rank <= 25) %>% 
+  arrange(-WAR) %>% 
+  group_by(position) %>% 
+  mutate(pos_rank = rank(rank)) %>% 
+  mutate(scale_pos_rank = scales::rescale(pos_rank, c(15, 5)))
+
+
+A <- ggplot(data = war_frame, aes(x = reorder(rank, -rank), y = WAR)) +
+  geom_col(aes(alpha = scale_pos_rank, fill = position), color = "white", size = .3) +
+  scale_x_discrete(breaks = war_frame$rank, labels = war_frame$name_label) +
+  geom_text(aes(y = 0.05, label = label), size = 7.5, hjust = 0, family = "Chakra Petch") +
+  scale_fill_manual(values = my_pallette) +
+  guides(fill = FALSE, alpha = FALSE) +
+  coord_flip() +
+  labs(y = "Wins Above Replacement (WAR)",
+       x = "",
+       title = "Top 25 Fantasy WAR Seasons \n2010-2019",
+       subtitle = ".5 PPR",
+       caption = ("(QB-2RB-2WR-FLX-TE-DST-K) | @statholesports")) +
+  theme_new() +
+  theme(plot.title = element_text(hjust = .5),
+        plot.subtitle = element_text(hjust = .5))
+
+Cairo(width = 1100, height = 1000, "war_by_season.png", "png")
+print(A)
+dev.off()
+
+
+
+logo <- image_read("stathole logo t18.png") %>% 
+  image_scale("x150") 
+image_read("war_by_season.png") %>% 
+  image_composite(logo, offset = "+900+700") %>% 
+  image_write("logo_test.png")
+
+```
+
+
+# Scott Data set
+```{r}
+Scott <- war_final %>% 
+  group_by(year) %>% 
+  top_n(300, wt = WAR) %>% 
+  arrange(desc(year), desc(WAR)) %>% 
+  select(1:3,5:8)
+
+write.csv(Scott, file = "FF_WAR_Top300_2010_2019.csv")
+```
+
+Scott Graph 2
+
+```{r}
+my_pallette <- c("#32A13F", 
+                 "#4F8DC8",
+                 "#EC3D17",
+                 "#CFD509",
+                 "#32B639",
+                 "#CFD509" )
+
+# EC3D17 - red
+# 4F8DC8 - blue
+# CFD509 - yellow
+
+
+theme_new <- function() {
+  theme_bw(base_size = 24) %+replace%
+    theme(
+      panel.grid = element_blank(),
+      axis.text = element_text(family = "Chakra Petch", size = 24),
+      axis.title = element_text(family = "Chakra Petch", face = "bold"),
+      plot.title = element_text(family = "Chakra Petch", face = "bold", size = 34)
+    )
+}
+graph_code <- readRDS("WAR_HPPR_2010_2019.rds") 
+
+war_frame2 <- graph_code %>% 
+  ungroup() %>% 
+  filter(year >= 2012) %>% 
+  mutate(rank = rank(desc(WAR)),
+         name_label = paste0(player, " ", " (", year, ")"),
+         label = paste0("Rank: ", rank, " - ", position)) %>% 
+  filter(rank <= 25) %>% 
+  arrange(-WAR) %>% 
+  group_by(position) %>% 
+  mutate(pos_rank = rank(rank)) %>% 
+  mutate(scale_pos_rank = scales::rescale(pos_rank, c(15, 5)))
+
+
+A <- ggplot(data = war_frame2, aes(x = reorder(rank, -rank), y = WAR)) +
+  geom_col(aes(alpha = .5, fill = position), color = "white", size = .3) +
+  scale_x_discrete(breaks = war_frame2$rank, labels = war_frame2$name_label) +
+  geom_text(aes(y = 0.05, label = label), size = 7.5, hjust = 0, family = "Chakra Petch") +
+  scale_fill_manual(values = my_pallette) +
+  guides(fill = FALSE, alpha = FALSE) +
+  coord_flip() +
+  labs(y = "Wins Above Replacement (WAR)",
+       x = "",
+       title = "Top 25 Fantasy WAR Seasons \n2012-2019",
+       subtitle = ".5 PPR",
+       caption = ("(QB-2RB-2WR-FLX-TE-DST-K) | @statholesports")) +
+  theme_new() +
+  theme(plot.title = element_text(hjust = .5),
+        plot.subtitle = element_text(hjust = .5))
+
+Cairo(width = 1100, height = 1000, "war_last_12_19.png", "png")
+print(A)
+dev.off()
+
+
+
+# logo <- image_read("stathole logo t18.png") %>%
+#   image_scale("x150")
+# image_read("war_last_12_19.png") %>%
+#   image_composite(logo, offset = "+900+700") %>%
+#   image_write("stathole logo t18.png")
+
+logo <- image_read("stathole logo.png") %>% 
+  image_scale("x150") 
+image_read("war_last_12_19.png") %>% 
+  image_composite(logo, offset = "+900+700") %>% 
+  image_write("graph2.png")
+```
+
+
